@@ -82,12 +82,12 @@ def run_analysis():
     try:
         result = con.execute("""
             SELECT 
-                APPROX_QUANTILE(avg_wage, 0.25) as percentil_25,
-                APPROX_QUANTILE(avg_wage, 0.50) as median,
-                APPROX_QUANTILE(avg_wage, 0.75) as percentil_75,
-                APPROX_QUANTILE(avg_wage, 0.90) as percentil_90
+                APPROX_QUANTILE(value, 0.25) as percentil_25,
+                APPROX_QUANTILE(value, 0.50) as median,
+                APPROX_QUANTILE(value, 0.75) as percentil_75,
+                APPROX_QUANTILE(value, 0.90) as percentil_90
             FROM wages_by_region
-            WHERE avg_wage IS NOT NULL
+            WHERE value IS NOT NULL
         """).fetchdf()
         print(result.to_string(index=False))
     except Exception as e:
