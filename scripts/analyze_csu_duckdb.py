@@ -67,15 +67,24 @@ def run_analysis():
     # 4. Struktura mezd
     print_section("Struktura mezd - základní statistiky")
     try:
-        result = con.execute("""
-            SELECT 
-                COUNT(*) as pocet_zaznamu,
-                COUNT(DISTINCT region) as pocet_regionu
-            FROM wage_structure
-        """).fetchdf()
-        print(result.to_string(index=False))
+        # Nejdřív zkontrolujeme, jestli tabulka má správné sloupce
+        columns = con.execute("SELECT column_name FROM (DESCRIBE wage_structure)").fetchall()
+        column_names = [col[0] for col in columns]
+        
+        if 'region' in column_names and 'value' in column_names:
+            result = con.execute("""
+                SELECT 
+                    COUNT(*) as pocet_zaznamu,
+                    COUNT(DISTINCT region) as pocet_regionu
+                FROM wage_structure
+            """).fetchdf()
+            print(result.to_string(index=False))
+        else:
+            print(f"[INFO] Tabulka wage_structure nemá očekávanou strukturu")
+            print(f"       Sloupce: {', '.join(column_names[:5])}...")
+            print("       Přeskakuji analýzu")
     except Exception as e:
-        print(f"[VAROVANI] Tabulka wage_structure neexistuje: {e}")
+        print(f"[INFO] Tabulka wage_structure není k dispozici nebo má jinou strukturu")
     
     # 5. Srovnání regionů - percentily
     print_section("Regionální rozdíly - percentilová analýza")

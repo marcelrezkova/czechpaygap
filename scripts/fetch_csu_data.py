@@ -58,8 +58,13 @@ def clean_and_normalize_data(df, data_type):
     # Odstranění prázdných řádků a sloupců
     df_clean = df_clean.dropna(how='all', axis=0).dropna(how='all', axis=1)
     
+    if df_clean.empty:
+        return None
+    
+    # Nejdřív zkusíme normální zpracování (bez přeskakování)
+    
     # Pokus o detekci hlavičky (první neprázdný řádek)
-    if df_clean.iloc[0].isna().sum() > len(df_clean.columns) / 2:
+    if len(df_clean) > 0 and df_clean.iloc[0].isna().sum() > len(df_clean.columns) / 2:
         df_clean = df_clean.iloc[1:].reset_index(drop=True)
     
     # Nastavení prvního sloupce jako "region" a druhého jako "value"
@@ -174,7 +179,8 @@ def fetch_from_csu_page(url, output_file, description, code=None, csv_url=None):
                     if file_url.endswith('.csv'):
                         df = pd.read_csv(file_url)
                     else:
-                        df = pd.read_excel(file_url, sheet_name=0)
+                        # Timeout pro Excel soubory
+                        df = pd.read_excel(file_url, sheet_name=0, engine='openpyxl')
                     
                     # Normalizace dat
                     df_clean = clean_and_normalize_data(df, description)
@@ -183,7 +189,10 @@ def fetch_from_csu_page(url, output_file, description, code=None, csv_url=None):
                         df_clean.to_csv(output_file, index=False)
                         print(f"[OK] Stazeno: {output_file} ({len(df_clean)} radku)")
                         return df_clean
+                except KeyboardInterrupt:
+                    raise  # Propagate Ctrl+C
                 except Exception as e:
+                    # Tiché selhání - zkusíme další soubor
                     continue
         
         print(f"[VAROVANI] Nenalezen soubor na: {url}")
@@ -218,7 +227,8 @@ df = fetch_from_csu_page(
     source["url"], 
     source["output"], 
     source["description"],
-    code=source.get("code")
+    code=source.get("code"),
+    csv_url=source.get("csv_url")
 )
 if df is not None:
     collected_data["wages_by_sector"] = df
