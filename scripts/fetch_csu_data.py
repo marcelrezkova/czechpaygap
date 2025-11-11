@@ -16,6 +16,7 @@ CSU_SOURCES = {
     "wages_by_sector": {
         "url": "https://csu.gov.cz/produkty/zamestnanci-a-prumerne-hrube-mesicni-mzdy-podle-odvetvi",
         "code": "110079-25",
+        "csv_url": "https://csu.gov.cz/docs/107508/185d8d2f-675c-fa34-dbe6-8fb0034d3d32/110079-25data090825.csv?version=1.0",
         "description": "Zaměstnanci a mzdy podle odvětví",
         "output": "data/csu_wages_by_sector.csv"
     },
@@ -84,9 +85,81 @@ def clean_and_normalize_data(df, data_type):
     
     return df_clean if not df_clean.empty else None
 
-def fetch_from_csu_page(url, output_file, description):
+def fetch_csv_data_from_csu(code):
+    """Stáhne CSV data přímo z ČSÚ API podle kódu datasetu"""
+    try:
+        from io import StringIO
+        
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        
+        # Různé pokusy o stažení CSV podle kódu
+        csv_urls = [
+            # Formát 1: documents s aktuálním datem
+            f"https://www.czso.cz/documents/10180/184344914/{code}data090825.csv",
+            f"https://www.czso.cz/documents/10180/184344914/{code}data.csv",
+            # Formát 2: csu.cz downloads
+            f"https://csu.gov.cz/sites/default/files/{code}data.csv",
+            # Formát 3: vdb export
+            f"https://vdb.czso.cz/vdbvo2/faces/cs/download?pvo={code}&f=CSV",
+            # Formát 4: přímý download
+            f"https://www.czso.cz/documents/10180/{code}",
+        ]
+        
+        for csv_url in csv_urls:
+            try:
+                print(f"  [TRY] {csv_url}")
+                r = requests.get(csv_url, headers=headers, timeout=15)
+                if r.status_code == 200 and len(r.text) > 100:
+                    # Zkusíme načíst jako CSV
+                    df = pd.read_csv(StringIO(r.text))
+                    if not df.empty:
+                        print(f"  [SUCCESS] Stazeno z: {csv_url}")
+                        return df
+            except Exception as e:
+                continue
+        
+        return None
+        
+    except Exception as e:
+        print(f"  [DEBUG] API error: {e}")
+        return None
+
+def fetch_from_csu_page(url, output_file, description, code=None, csv_url=None):
     """Pokusí se najít a stáhnout Excel/CSV soubory ze stránky produktu ČSÚ"""
     try:
+        from io import StringIO
+        
+        # Pokud máme přímou CSV URL, použijeme ji
+        if csv_url:
+            print(f"  [CSV] Stahuji primo z: {csv_url}")
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            try:
+                r = requests.get(csv_url, headers=headers, timeout=20)
+                if r.status_code == 200:
+                    df = pd.read_csv(StringIO(r.text))
+                    if not df.empty:
+                        # Normalizace dat
+                        df_clean = clean_and_normalize_data(df, description)
+                        if df_clean is not None and not df_clean.empty:
+                            df_clean.to_csv(output_file, index=False)
+                            print(f"[OK] Stazeno: {output_file} ({len(df_clean)} radku)")
+                            return df_clean
+            except Exception as e:
+                print(f"  [CHYBA] CSV download: {e}")
+        
+        # Pokud máme kód, zkusíme API
+        if code:
+            print(f"  [API] Zkousim stahnout pres API s kodem: {code}")
+            df = fetch_csv_data_from_csu(code)
+            if df is not None and not df.empty:
+                # Normalizace dat
+                df_clean = clean_and_normalize_data(df, description)
+                if df_clean is not None and not df_clean.empty:
+                    df_clean.to_csv(output_file, index=False)
+                    print(f"[OK] Stazeno: {output_file} ({len(df_clean)} radku)")
+                    return df_clean
+        
+        # Fallback: Parsování HTML stránky
         headers = {'User-Agent': 'Mozilla/5.0'}
         r = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
@@ -141,7 +214,12 @@ time.sleep(1)
 # 2. Stáhnout data podle odvětví
 source = CSU_SOURCES["wages_by_sector"]
 print(f"\n[2/4] {source['description']}")
-df = fetch_from_csu_page(source["url"], source["output"], source["description"])
+df = fetch_from_csu_page(
+    source["url"], 
+    source["output"], 
+    source["description"],
+    code=source.get("code")
+)
 if df is not None:
     collected_data["wages_by_sector"] = df
 time.sleep(1)
@@ -149,7 +227,12 @@ time.sleep(1)
 # 3. Stáhnout časové řady
 source = CSU_SOURCES["wages_timeseries"]
 print(f"\n[3/4] {source['description']}")
-df = fetch_from_csu_page(source["url"], source["output"], source["description"])
+df = fetch_from_csu_page(
+    source["url"], 
+    source["output"], 
+    source["description"],
+    code=source.get("code")
+)
 if df is not None:
     collected_data["wages_timeseries"] = df
 time.sleep(1)

@@ -101,11 +101,11 @@ def run_analysis():
             COPY (
                 SELECT 
                     region,
-                    avg_wage,
-                    RANK() OVER (ORDER BY avg_wage DESC) as rank
+                    value as avg_wage,
+                    RANK() OVER (ORDER BY value DESC) as rank
                 FROM wages_by_region
-                WHERE avg_wage IS NOT NULL
-                ORDER BY avg_wage DESC
+                WHERE value IS NOT NULL
+                ORDER BY value DESC
             ) TO 'data/csu_regional_summary.csv' (HEADER, DELIMITER ',')
         """)
         print("[OK] Exportovano: data/csu_regional_summary.csv")
