@@ -28,10 +28,22 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # === Key Metrics ===
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("🧭 Regions", len(df))
-col2.metric("💰 Avg Pay Gap", f"{int(df['pay_gap'].mean()):,} Kč")
-col3.metric("📊 Total Offers", int(df['offers'].sum()))
+col2.metric("� ČSÚ Avg", f"{int(df['avg_wage'].mean()):,} Kč")
+col3.metric("�💰 Avg Pay Gap", f"{int(df['pay_gap'].mean()):,} Kč")
+col4.metric("� Total Offers", int(df['offers'].sum()))
+
+st.markdown("<hr class='divider'>", unsafe_allow_html=True)
+
+# === ČSÚ Statistics ===
+st.markdown("### 📊 Statistiky z Českého statistického úřadu")
+csu_col1, csu_col2, csu_col3 = st.columns(3)
+csu_col1.metric("📍 Min. průměrná mzda", f"{int(df['avg_wage'].min()):,} Kč", 
+                delta=df[df['avg_wage'] == df['avg_wage'].min()]['region'].values[0])
+csu_col2.metric("📊 Celkový průměr ČSÚ", f"{int(df['avg_wage'].mean()):,} Kč")
+csu_col3.metric("📍 Max. průměrná mzda", f"{int(df['avg_wage'].max()):,} Kč",
+                delta=df[df['avg_wage'] == df['avg_wage'].max()]['region'].values[0])
 
 st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
@@ -44,12 +56,13 @@ fig = px.bar(
     barmode="group",
     text_auto=".0f",
     color_discrete_sequence=["#00C2FF", "#FF00C8"],
+    labels={"avg_wage": "ČSÚ Průměr", "avg_offer": "Nabídky z portálů"}
 )
 fig.update_layout(
     template="plotly_dark",
     xaxis_title="Region",
     yaxis_title="Mzda (Kč)",
-    legend_title="Typ mzdy",
+    legend_title="Zdroj dat",
 )
 st.plotly_chart(fig, use_container_width=True)
 

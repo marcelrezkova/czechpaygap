@@ -1,23 +1,24 @@
 # pipeline/step2_metrics.py
 import pandas as pd
-from supabase import create_client
+import duckdb
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+print("[LOAD] Loading data from DuckDB...")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_OUT = os.getenv("SUPABASE_TABLE_METRICS", "wages_comparison")
+# Připojení k DuckDB databázím
+csu_db = duckdb.connect("data/csu_data.duckdb", read_only=True)
+jobs_db = duckdb.connect("data/jobs.duckdb", read_only=True)
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Načtení dat z časových řad (nejnovější průměrná mzda pro ČR)
+timeseries = csu_db.execute("SELECT * FROM wages_timeseries ORDER BY region DESC LIMIT 1").fetchdf()
+avg_wage_cz = timeseries['value'].iloc[0]
+print(f"[CSU] Celkovy prumer CR z casovych rad: {avg_wage_cz:.0f} Kc")
 
-print("📥 Loading data from Supabase...")
-csu = pd.DataFrame(supabase.table("csu_wages").select("*").execute().data)
-jobs = pd.DataFrame(supabase.table("job_listings").select("*").execute().data)
+# Načtení dat z job portálů
+jobs = jobs_db.execute("SELECT * FROM job_listings").fetchdf()
 
 # Agregace dat z pracovních nabídek podle regionu a zdroje
-print(f"📊 Zpracování {len(jobs)} nabídek z {jobs['source'].nunique() if 'source' in jobs.columns else 1} zdrojů...")
+print(f"[DATA] Zpracovani {len(jobs)} nabidek z {jobs['source'].nunique() if 'source' in jobs.columns else 1} zdroju...")
 
 # Celková agregace podle regionu
 agg_total = jobs.groupby("region").agg(
@@ -35,17 +36,12 @@ if "source" in jobs.columns:
         offers=("salary_offer", "count")
     ).reset_index()
     agg_by_source.to_csv("data/wages_by_source.csv", index=False)
-    print(f"✅ Uložena agregace podle zdroje: data/wages_by_source.csv")
-    
-    # Upload dat podle zdrojů do Supabase
-    try:
-        supabase.table("wages_by_source").upsert(agg_by_source.to_dict(orient="records")).execute()
-        print(f"📤 Nahráno {len(agg_by_source)} řádků do Supabase → wages_by_source")
-    except Exception as e:
-        print(f"⚠️  Chyba při nahrávání wages_by_source: {e}")
+    print(f"[OK] Ulozena agregace podle zdroje: data/wages_by_source.csv")
 
-# Spojení s ČSÚ daty
-merged = csu.merge(agg_total, on="region", how="inner")
+# Přidání ČSÚ průměru ke každému regionu
+# Prozatím používáme celkový průměr ČR pro všechny regiony
+agg_total["avg_wage"] = avg_wage_cz
+merged = agg_total.copy()
 merged["pay_gap"] = merged["avg_offer"] - merged["avg_wage"]
 merged["pay_gap_pct"] = ((merged["avg_offer"] - merged["avg_wage"]) / merged["avg_wage"] * 100).round(2)
 
@@ -53,12 +49,14 @@ merged["pay_gap_pct"] = ((merged["avg_offer"] - merged["avg_wage"]) / merged["av
 merged = merged.sort_values("pay_gap", ascending=False)
 
 merged.to_csv("data/wages_comparison.csv", index=False)
-print(f"✅ Metriky vypočteny a uloženy: data/wages_comparison.csv")
-print(f"\n📊 Statistiky:")
-print(f"  - Celkem regionů: {len(merged)}")
-print(f"  - Průměrný pay gap: {merged['pay_gap'].mean():.0f} Kč ({merged['pay_gap_pct'].mean():.1f}%)")
-print(f"  - Max pay gap: {merged['pay_gap'].max():.0f} Kč v {merged.iloc[0]['region']}")
-print(f"  - Min pay gap: {merged['pay_gap'].min():.0f} Kč v {merged.iloc[-1]['region']}")
+print(f"[OK] Metriky vypocteny a ulozeny: data/wages_comparison.csv")
+print(f"\n[STATS] Statistiky:")
+print(f"  - Celkem regionu: {len(merged)}")
+print(f"  - Prumerny pay gap: {merged['pay_gap'].mean():.0f} Kc ({merged['pay_gap_pct'].mean():.1f}%)")
+print(f"  - Max pay gap: {merged['pay_gap'].max():.0f} Kc v {merged.iloc[0]['region']}")
+print(f"  - Min pay gap: {merged['pay_gap'].min():.0f} Kc v {merged.iloc[-1]['region']}")
 
-supabase.table(SUPABASE_OUT).upsert(merged.to_dict(orient="records")).execute()
-print(f"\n📤 Uploaded {len(merged)} rows to Supabase → {SUPABASE_OUT}")
+# Uzavření DuckDB připojení
+csu_db.close()
+jobs_db.close()
+print("\n[OK] DuckDB pripojeni uzavrena")
