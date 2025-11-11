@@ -1,0 +1,54 @@
+/* === LAYOUT & COLORS === */
+body, .main {
+    background-color: #0B0C10;
+    color: #FFFFFF;
+    font-family: 'Inter', sans-serif;
+}
+
+/* === HEADER === */
+.header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+.header h1 {
+    font-size: 3rem;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #00C2FF, #FF00C8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.subtitle {
+    font-size: 1.1rem;
+    color: #9EA1A6;
+    font-weight: 300;
+}
+
+/* === METRICS === */
+div[data-testid="stMetricValue"] {
+    font-size: 2rem !important;
+    color: #00E6A8 !important;
+}
+
+/* === DIVIDER === */
+.divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.2), rgba(0,0,0,0));
+    margin: 2rem 0;
+}
+
+/* === FOOTER === */
+.footer {
+    text-align: center;
+    margin-top: 4rem;
+    padding: 1rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+.footer p {
+    font-size: 0.9rem;
+    color: #A3A7AC;
+}
+.footer .note {
+    font-style: italic;
+    color: #FF00C8;
+}
