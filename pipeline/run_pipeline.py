@@ -48,8 +48,10 @@ if __name__ == "__main__":
     if not run_script("scripts/fetch_csu_data.py", "Stahování dat z ČSÚ"):
         log("⚠️  Pipeline pokračuje i přes chybu v ČSÚ datech...")
     
-    # KROK 2: Scrape pracovní nabídky
-    if not run_script("scripts/scrape_job_offers.py", "Scraping pracovních nabídek"):
+    # KROK 2: Scrape pracovní nabídky (použij advanced verzi pokud existuje)
+    import os
+    scraper = "scripts/scrape_job_offers_advanced.py" if os.path.exists("scripts/scrape_job_offers_advanced.py") else "scripts/scrape_job_offers.py"
+    if not run_script(scraper, "Scraping pracovních nabídek (paralelní)"):
         log("⚠️  Pipeline pokračuje i přes chybu ve scrapingu...")
     
     # KROK 3: Upload dat do Supabase
